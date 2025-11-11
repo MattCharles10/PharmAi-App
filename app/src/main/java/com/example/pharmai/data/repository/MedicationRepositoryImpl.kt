@@ -1,235 +1,122 @@
 package com.example.pharmai.data.repository
 
-import com.example.pharmai.data.local.database.dao.MedicationDao
-import com.example.pharmai.data.remote.api.MedicationApi
+import com.example.pharmai.data.remote.api.ConceptProperty
+import com.example.pharmai.data.remote.api.RxNormApi
+import com.example.pharmai.data.remote.api.RxNormDrugResponse
 import com.example.pharmai.domain.model.Medication
 import com.example.pharmai.domain.model.DrugInteraction
 import com.example.pharmai.domain.model.InteractionSeverity
-import com.example.pharmai.domain.repository.MedicationRepository
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
-import javax.inject.Inject
 
-class MedicationRepositoryImpl @Inject constructor(
-    private val medicationDao: MedicationDao,
-    private val medicationApi: MedicationApi
-) : MedicationRepository {
+class MedicationRepositoryImpl(
+    private val rxNormApi: RxNormApi
+) {
+    suspend fun searchMedications(query: String): List<Medication> {
+        return try {
+            println("DEBUG: Making API call for: $query")
+            val response = rxNormApi.searchDrugs(query)
+            println("DEBUG: API Response: $response")
 
-    override suspend fun searchMedications(query: String): List<Medication> {
-        // Simulate API/database search with delay
-        kotlinx.coroutines.delay(500) // Simulate network delay
+            val medications = mapRxNormResponseToMedications(response)
+            println("DEBUG: Mapped ${medications.size} medications")
 
-        return if (query.isBlank()) {
+            medications
+        } catch (e: Exception) {
+            println("DEBUG: API Error: ${e.message}")
             emptyList()
-        } else {
-            mockMedications.filter {
-                it.name.contains(query, ignoreCase = true) ||
-                        it.type.contains(query, ignoreCase = true) ||
-                        it.description.contains(query, ignoreCase = true)
+        }
+    }
+
+    private fun mapRxNormResponseToMedications(response: RxNormDrugResponse): List<Medication> {
+        val medications = mutableListOf<Medication>()
+
+        // Check if we have valid data
+        if (response.drugGroup == null) {
+            println("DEBUG: drugGroup is null")
+            return emptyList()
+        }
+
+        if (response.drugGroup.conceptGroup.isNullOrEmpty()) {
+            println("DEBUG: conceptGroup is null or empty")
+            return emptyList()
+        }
+
+        response.drugGroup.conceptGroup.forEach { conceptGroup ->
+            conceptGroup.conceptProperties?.forEach { concept ->
+                val medicationName = concept.name ?: "Unknown Drug"
+                println("DEBUG: Processing medication: $medicationName")
+
+                val medication = Medication(
+                    id = "rxnorm_${concept.rxcui ?: "unknown"}",
+                    name = medicationName,
+                    dosage = "",
+                    strength = extractStrength(concept.name ?: ""),
+                    type = concept.tty ?: "Unknown",
+                    description = buildDescription(concept),
+                    interactions = getInteractionsForDrug(medicationName),
+                    source = "RxNorm API"
+                )
+                medications.add(medication)
             }
         }
+
+        return medications
     }
 
-    override fun searchMedicationsFlow(query: String): Flow<List<Medication>> = flow {
-        if (query.isBlank()) {
-            emit(emptyList())
-            return@flow
+    private fun extractStrength(drugName: String): String {
+        // Extract strength from drug name if present (e.g., "Aspirin 81mg" -> "81mg")
+        val strengthRegex = """\b(\d+\s*(mg|mcg|g|ml))\b""".toRegex(RegexOption.IGNORE_CASE)
+        return strengthRegex.find(drugName)?.value ?: ""
+    }
+
+    private fun buildDescription(concept: ConceptProperty): String {
+        val description = StringBuilder()
+
+        description.append("RxNorm ID: ${concept.rxcui ?: "N/A"}")
+
+        if (!concept.tty.isNullOrEmpty()) {
+            description.append(" | Type: ${concept.tty}")
         }
 
-        // Simulate network call
-        kotlinx.coroutines.delay(500)
-
-        val results = mockMedications.filter {
-            it.name.contains(query, ignoreCase = true)
+        if (!concept.synonym.isNullOrEmpty()) {
+            description.append(" | Also known as: ${concept.synonym}")
         }
-        emit(results)
+
+        return description.toString()
     }
 
-    override suspend fun getMedicationById(id: String): Medication? {
-        return mockMedications.find { it.id == id }
-    }
-
-    override suspend fun checkInteractions(medication1: String, medication2: String): DrugInteraction? {
-        // Simulate API call delay
-        kotlinx.coroutines.delay(1000)
-
-        return createMockInteraction(medication1, medication2)
-    }
-
-    override fun getUserMedications(): Flow<List<Medication>> {
-        // For demo, return mock data as Flow
-        return flow {
-            emit(mockMedications.take(2)) // Return first 2 as user's medications
-        }
-    }
-
-    override suspend fun addUserMedication(medication: Medication) {
-        // In real app, save to database
-        // For now, just print to log
-        println("Added medication: ${medication.name}")
-    }
-
-    override suspend fun removeUserMedication(medicationId: String) {
-        // In real app, remove from database
-        // For now, just print to log
-        println("Removed medication: $medicationId")
-    }
-
-    private fun createMockInteraction(med1: String, med2: String): DrugInteraction {
-        val lowerMed1 = med1.lowercase()
-        val lowerMed2 = med2.lowercase()
-
-        return when {
-            ("warfarin" in lowerMed1 && "aspirin" in lowerMed2) ||
-                    ("aspirin" in lowerMed1 && "warfarin" in lowerMed2) -> {
+    private fun getInteractionsForDrug(drugName: String): List<DrugInteraction> {
+        return when (drugName.lowercase()) {
+            "aspirin" -> listOf(
                 DrugInteraction(
-                    medication1 = med1,
-                    medication2 = med2,
+                    medication1 = "Aspirin",
+                    medication2 = "Warfarin",
                     severity = InteractionSeverity.HIGH,
-                    description = "Increased risk of bleeding when warfarin is taken with aspirin.",
+                    description = "Increased risk of bleeding and bruising",
                     recommendations = listOf(
-                        "Monitor for signs of bleeding",
+                        "Monitor INR closely",
                         "Consider alternative pain relief",
-                        "Consult your doctor before combining"
+                        "Watch for signs of bleeding"
                     ),
                     riskFactors = listOf(
-                        "Increased bleeding risk",
-                        "Reduced platelet function"
+                        "Elderly patients",
+                        "History of GI bleeding",
+                        "Renal impairment"
                     )
                 )
-            }
-            ("lisinopril" in lowerMed1 && "ibuprofen" in lowerMed2) ||
-                    ("ibuprofen" in lowerMed1 && "lisinopril" in lowerMed2) -> {
+            )
+            "ibuprofen" -> listOf(
                 DrugInteraction(
-                    medication1 = med1,
-                    medication2 = med2,
+                    medication1 = "Ibuprofen",
+                    medication2 = "Aspirin",
                     severity = InteractionSeverity.MEDIUM,
-                    description = "NSAIDs may reduce the blood pressure lowering effects of ACE inhibitors.",
+                    description = "May reduce aspirin's cardioprotective effects",
                     recommendations = listOf(
-                        "Monitor blood pressure regularly",
-                        "Use lowest effective NSAID dose",
-                        "Consider acetaminophen as alternative"
-                    ),
-                    riskFactors = listOf(
-                        "Reduced antihypertensive effect",
-                        "Potential kidney function impact"
+                        "Take ibuprofen 2 hours after aspirin",
+                        "Consider acetaminophen instead"
                     )
                 )
-            }
-            ("simvastatin" in lowerMed1 && "grapefruit" in lowerMed2) ||
-                    ("grapefruit" in lowerMed1 && "simvastatin" in lowerMed2) -> {
-                DrugInteraction(
-                    medication1 = med1,
-                    medication2 = med2,
-                    severity = InteractionSeverity.HIGH,
-                    description = "Grapefruit can significantly increase simvastatin levels in blood.",
-                    recommendations = listOf(
-                        "Avoid grapefruit products",
-                        "Consider alternative statin",
-                        "Monitor for muscle pain or weakness"
-                    ),
-                    riskFactors = listOf(
-                        "Increased risk of muscle damage",
-                        "Potential liver toxicity"
-                    )
-                )
-            }
-            else -> {
-                DrugInteraction(
-                    medication1 = med1,
-                    medication2 = med2,
-                    severity = InteractionSeverity.LOW,
-                    description = "No significant interactions found. Always consult your healthcare provider.",
-                    recommendations = listOf(
-                        "Continue monitoring as usual",
-                        "Report any unusual symptoms"
-                    ),
-                    riskFactors = emptyList()
-                )
-            }
+            )
+            else -> emptyList()
         }
     }
-
-    companion object {
-        private val mockMedications = listOf(
-            Medication(
-                id = "1",
-                name = "Aspirin",
-                dosage = "81mg",
-                strength = "Low",
-                type = "NSAID",
-                description = "Pain reliever and anti-inflammatory medication"
-            ),
-            Medication(
-                id = "2",
-                name = "Lisinopril",
-                dosage = "10mg",
-                strength = "Medium",
-                type = "Antihypertensive",
-                description = "ACE inhibitor for high blood pressure"
-            ),
-            Medication(
-                id = "3",
-                name = "Metformin",
-                dosage = "500mg",
-                strength = "Medium",
-                type = "Antidiabetic",
-                description = "Oral diabetes medicine"
-            ),
-            Medication(
-                id = "4",
-                name = "Atorvastatin",
-                dosage = "20mg",
-                strength = "High",
-                type = "Statin",
-                description = "Lowers cholesterol and reduces risk of heart attack"
-            ),
-            Medication(
-                id = "5",
-                name = "Levothyroxine",
-                dosage = "50mcg",
-                strength = "Medium",
-                type = "Thyroid Hormone",
-                description = "Treats hypothyroidism (underactive thyroid)"
-            ),
-            Medication(
-                id = "6",
-                name = "Warfarin",
-                dosage = "5mg",
-                strength = "High",
-                type = "Anticoagulant",
-                description = "Blood thinner to prevent blood clots"
-            ),
-            Medication(
-                id = "7",
-                name = "Ibuprofen",
-                dosage = "400mg",
-                strength = "Medium",
-                type = "NSAID",
-                description = "Non-steroidal anti-inflammatory drug for pain and inflammation"
-            ),
-            Medication(
-                id = "8",
-                name = "Simvastatin",
-                dosage = "40mg",
-                strength = "High",
-                type = "Statin",
-                description = "Lowers cholesterol levels in the blood"
-            )
-        )
-    }
-}
-
-// Extension function to convert entity to domain model (if needed later)
-private fun com.example.pharmai.data.local.database.entity.MedicationEntity.toMedication(): Medication {
-    return Medication(
-        id = this.id,
-        name = this.name,
-        dosage = this.dosage,
-        strength = this.strength,
-        type = this.type,
-        description = this.description,
-        imageUrl = this.imageUrl
-    )
 }

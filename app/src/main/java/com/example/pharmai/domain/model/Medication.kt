@@ -8,5 +8,6 @@ data class Medication(
     val type: String = "",
     val description: String = "",
     val interactions: List<DrugInteraction> = emptyList(),
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val source: String = "Demo"
 )
