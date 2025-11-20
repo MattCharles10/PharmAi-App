@@ -1,304 +1,230 @@
+// 📄 presentation/screen/PillIdentificationScreen.kt
 package com.example.pharmai.presentation.screen
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.pharmai.presentation.component.pill.CameraView
+import com.example.pharmai.presentation.component.pill.PillCard
+import com.example.pharmai.presentation.component.pill.PillSearchCriteria
+import com.example.pharmai.presentation.viewmodel.PillIdentificationViewModel
+import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PillIdentificationScreen(
-    onBackClick: () -> Unit
+    onNavigateBack: () -> Unit
 ) {
-    var isAnalyzing by remember { mutableStateOf(false) }
-    var analysisResult by remember { mutableStateOf<PillAnalysisResult?>(null) }
-    var showCamera by remember { mutableStateOf(false) }
+    val viewModel: PillIdentificationViewModel = viewModel()
+    val pillState = viewModel.pillState.value
+    val searchCriteria = viewModel.searchCriteria.value
+    val showCamera = viewModel.showCamera.value
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Header - FIXED: Proper onBackClick
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = {
-                    println("DEBUG: Back button clicked in PillIdentification")
-                    onBackClick()
-                }
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+    var contentVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(300)
+        contentVisible = true
+    }
+
+    // Show camera if activated
+    if (showCamera) {
+        CameraView(
+            onImageCaptured = { imageData ->
+                viewModel.identifyPillFromImage(imageData)
+            },
+            onClose = {
+                viewModel.hideCamera()
             }
-            Text(
-                text = "Pill Identification",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
+        )
+        return
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Pill Identification")
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    if (pillState.identifiedPills.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.clearResults() }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear Results")
+                        }
+                    }
+                }
             )
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (analysisResult == null) {
-            // Camera/Upload Section
+    ) { paddingValues ->
+        AnimatedVisibility(
+            visible = contentVisible,
+            enter = fadeIn(animationSpec = tween(800))
+        ) {
             Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
             ) {
-                // Camera Preview Placeholder
-                Box(
-                    modifier = Modifier
-                        .size(280.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.CameraAlt,
-                            contentDescription = "Camera",
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Take a picture of your pill",
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(40.dp))
-
-                // Action Buttons
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Button(
-                        onClick = {
-                            showCamera = true
-                            // Simulate analysis for demo
-                            isAnalyzing = true
-                            // Simulate analysis process
-                            kotlinx.coroutines.GlobalScope.launch {
-                                kotlinx.coroutines.delay(2000)
-                                isAnalyzing = false
-                                analysisResult = simulatePillAnalysis()
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.CameraAlt, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Take Photo")
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            // Simulate analysis for demo
-                            isAnalyzing = true
-                            kotlinx.coroutines.GlobalScope.launch {
-                                kotlinx.coroutines.delay(2000)
-                                isAnalyzing = false
-                                analysisResult = simulatePillAnalysis()
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.PhotoLibrary, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Choose from Gallery")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Instructions
+                // Search Methods Card
                 Card(
-                    modifier = Modifier.fillMaxWidth(0.9f),
-                    shape = RoundedCornerShape(16.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp)
+                        modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Tips for better identification:",
-                            style = MaterialTheme.typography.titleSmall,
+                            text = "Identify Pills",
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("• Place pill on a contrasting background")
-                        Text("• Ensure good lighting")
-                        Text("• Capture both sides of the pill")
-                        Text("• Include any imprints or markings")
+                        Text(
+                            text = "Use camera to identify pills or search by imprint, color, and shape",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Camera Button
+                        Button(
+                            onClick = { viewModel.showCamera() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiary,
+                                contentColor = MaterialTheme.colorScheme.onTertiary
+                            )
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = "Camera")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Identify with Camera")
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Search Criteria
+                PillSearchCriteria(
+                    criteria = searchCriteria,
+                    onCriteriaChange = { viewModel.updateSearchCriteria(it) },
+                    onSearch = { viewModel.searchPillsByCriteria(searchCriteria) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Results Section
+                if (pillState.isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Identifying pill...")
+                        }
+                    }
+                } else if (pillState.identifiedPills.isNotEmpty()) {
+                    Column {
+                        Text(
+                            text = "Identified Pills (${pillState.identifiedPills.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(pillState.identifiedPills) { pill ->
+                                PillCard(pill = pill)
+                            }
+                        }
+                    }
+                } else if (searchCriteria.imprint.isNotBlank() || searchCriteria.color.isNotBlank() || searchCriteria.shape.isNotBlank()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "No results",
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "No pills found",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = "Try different search criteria",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.CameraAlt,
+                                contentDescription = "Get started",
+                                modifier = Modifier.size(120.dp),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Text(
+                                text = "Identify Your Pills",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Use the camera to identify unknown pills\nor search by imprint, color, and shape",
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
-        } else {
-            // Analysis Results
-            analysisResult?.let { result ->
-                PillAnalysisResultCard(result = result)
-            }
-        }
-
-        // Loading Overlay
-        if (isAnalyzing) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(60.dp),
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Analyzing pill...",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White
-                    )
-                }
-            }
         }
     }
-}
-
-@Composable
-fun PillAnalysisResultCard(result: PillAnalysisResult) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Pill Identified",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Pill Image
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(result.pillColor),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = result.imprint,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = result.medicationName,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = result.strength,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Action Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { /* Save to history */ },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Save")
-                }
-                Button(
-                    onClick = { /* Check interactions */ },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Check Interactions")
-                }
-            }
-        }
-    }
-}
-
-// Data Classes for Pill Analysis
-data class PillAnalysisResult(
-    val medicationName: String,
-    val strength: String,
-    val shape: String,
-    val colorName: String,
-    val pillColor: Color,
-    val imprint: String,
-    val manufacturer: String,
-    val description: String,
-    val uses: List<String>
-)
-
-// Mock analysis function
-private fun simulatePillAnalysis(): PillAnalysisResult {
-    return PillAnalysisResult(
-        medicationName = "Lisinopril",
-        strength = "10 mg",
-        shape = "Round",
-        colorName = "Pink",
-        pillColor = Color(0xFFFFB6C1),
-        imprint = "L10",
-        manufacturer = "Generic",
-        description = "Lisinopril is an ACE inhibitor used to treat high blood pressure and heart failure.",
-        uses = listOf(
-            "High blood pressure",
-            "Heart failure",
-            "Improving survival after heart attack"
-        )
-    )
 }

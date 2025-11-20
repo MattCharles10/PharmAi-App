@@ -4,16 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.pharmai.presentation.screen.HomeScreen
-import com.example.pharmai.presentation.screen.InteractionCheckerScreen
-import com.example.pharmai.presentation.screen.MainScreen
+import com.example.pharmai.presentation.screen.DashboardScreen
 import com.example.pharmai.presentation.screen.MedicationReminderScreen
 import com.example.pharmai.presentation.screen.MedicationSearchScreen
 import com.example.pharmai.presentation.screen.PillIdentificationScreen
-import com.example.pharmai.presentation.screen.ProfileScreen
-import com.example.pharmai.presentation.screen.SettingsScreen
+import com.example.pharmai.presentation.screen.PlaceholderScreen
 import com.example.pharmai.presentation.screen.auth.LoginScreen
 import com.example.pharmai.presentation.screen.auth.RegisterScreen
+import com.example.pharmai.presentation.screen.auth.SplashScreen
 
 @Composable
 fun NavGraph() {
@@ -21,112 +19,93 @@ fun NavGraph() {
 
     NavHost(
         navController = navController,
-        startDestination = Screens.Home.route
+        startDestination = Screens.Splash.route
     ) {
-        composable(Screens.Home.route) {
-            HomeScreen(
-                onLoginClick = { navController.navigate(Screens.Login.route) }
+        composable(Screens.Splash.route) {
+            SplashScreen(
+                onNavigateToLogin = {
+                    navController.navigate(Screens.Login.route) {
+                        popUpTo(Screens.Splash.route) { inclusive = true }
+                    }
+                },
+                onNavigateToDashboard = {
+                    navController.navigate(Screens.Dashboard.route) {
+                        popUpTo(Screens.Splash.route) { inclusive = true }
+                    }
+                }
             )
         }
 
         composable(Screens.Login.route) {
             LoginScreen(
-                onLoginSuccess = {
-                    navController.navigate(Screens.Main.route) {
-                        popUpTo(Screens.Home.route) { inclusive = true }
-                    }
-                },
                 onNavigateToRegister = {
                     navController.navigate(Screens.Register.route)
-                }
+                },
+                onNavigateToDashboard = {
+                    navController.navigate(Screens.Dashboard.route) {
+                        popUpTo(Screens.Login.route) { inclusive = true }
+                    }
+                },
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
         composable(Screens.Register.route) {
             RegisterScreen(
-                onRegisterSuccess = {
-                    navController.navigate(Screens.Main.route) {
-                        popUpTo(Screens.Home.route) { inclusive = true }
+                onNavigateToLogin = {
+                    navController.navigate(Screens.Login.route) {
+                        popUpTo(Screens.Register.route) { inclusive = true }
                     }
                 },
-                onNavigateToLogin = {
-                    navController.popBackStack()
-                }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        composable(Screens.Main.route) {
-            MainScreen(
-                onMedicationSearch = { navController.navigate(Screens.MedicationSearch.route) },
-                onInteractionCheck = { navController.navigate(Screens.InteractionChecker.route) },
-                onPillIdentification = { navController.navigate(Screens.PillIdentification.route) },
-                onProfile = { navController.navigate(Screens.Profile.route) }
+        composable(Screens.Dashboard.route) {
+            DashboardScreen(
+                onLogout = {
+                    navController.navigate(Screens.Login.route) {
+                        popUpTo(Screens.Dashboard.route) { inclusive = true }
+                    }
+                },
+                onNavigateToMedicationSearch = {
+                    navController.navigate(Screens.MedicationSearch.route)
+                },
+                onNavigateToInteractionChecker = {
+                    navController.navigate(Screens.InteractionChecker.route)
+                },
+                onNavigateToReminders = {
+                    navController.navigate(Screens.MedicationReminder.route)
+                },
+                onNavigateToPillIdentification = {
+                    navController.navigate(Screens.PillIdentification.route)
+                }
             )
         }
 
         composable(Screens.MedicationSearch.route) {
             MedicationSearchScreen(
-                onBackClick = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
         composable(Screens.InteractionChecker.route) {
-            InteractionCheckerScreen(
-                onBackClick = { navController.popBackStack() }
+            PlaceholderScreen(
+                title = "Interaction Checker",
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screens.MedicationReminder.route) {
+            MedicationReminderScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
         composable(Screens.PillIdentification.route) {
             PillIdentificationScreen(
-                onBackClick = { navController.popBackStack() }
-            )
-        }
-        composable(Screens.Profile.route) {
-            ProfileScreen(
-                onBackClick = { navController.popBackStack() },
-                onEditProfile = {
-                    // TODO: Implement edit profile screen
-                    println("Edit profile clicked")
-                },
-                onMedicationHistory = {
-                    // TODO: Implement medication history screen
-                    println("Medication history clicked")
-                },
-                onSettings = {
-                    println("Settings clicked - navigating to settings")
-                    navController.navigate(Screens.Settings.route)
-                },
-                onLogout = {
-                    println("Logout clicked")
-                    navController.navigate(Screens.Home.route) {
-                        popUpTo(Screens.Main.route) { inclusive = true }
-                    }
-                }
-            )
-        }
-
-        composable(Screens.Settings.route) {
-            SettingsScreen(
-                onBackClick = { navController.popBackStack() }
-            )
-        }
-        composable(Screens.MedicationReminders.route) {
-            MedicationReminderScreen(
-                onBackClick = { navController.popBackStack() },
-                onAddReminder = {
-                    // TODO: Implement add reminder functionality
-                    println("Add reminder clicked")
-                }
-            )
-        }
-
-        composable(Screens.Settings.route) {
-            SettingsScreen(
-                onBackClick = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }
 }
-
-
-

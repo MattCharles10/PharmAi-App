@@ -1,16 +1,34 @@
 package com.example.pharmai.domain.model
 
 import java.time.LocalTime
+import java.util.UUID
 
 data class MedicationReminder(
-    val id: String,
-    val medicationId: String,
+    val id: String = UUID.randomUUID().toString(),
     val medicationName: String,
     val dosage: String,
     val time: LocalTime,
-    val days: List<Int>, // 1-7 for days of week
+    val daysOfWeek: List<DayOfWeek>,
     val isActive: Boolean = true,
-    val createdAt: Long = System.currentTimeMillis(),
-    val hour: Int,
-    val minute: Int
+    val notes: String = ""
+) {
+    fun getNextReminderTime(): String {
+        return time.toString()
+    }
+}
+
+enum class DayOfWeek {
+    MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY;
+
+    companion object {
+        fun fromString(value: String): DayOfWeek {
+            return valueOf(value.uppercase())
+        }
+    }
+}
+
+data class ReminderState(
+    val reminders: List<MedicationReminder> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null
 )

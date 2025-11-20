@@ -1,141 +1,179 @@
 package com.example.pharmai.presentation.screen
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.pharmai.domain.model.MedicationReminder
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.pharmai.presentation.component.reminder.AddReminderDialog
+import com.example.pharmai.presentation.component.reminder.ReminderCard
+import com.example.pharmai.presentation.viewmodel.ReminderViewModel
+import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicationReminderScreen(
-    onBackClick: () -> Unit,
-    onAddReminder: () -> Unit
+    onNavigateBack: () -> Unit
 ) {
-    var reminders by remember { mutableStateOf(emptyList<MedicationReminder>()) }
+    val viewModel: ReminderViewModel = viewModel()
+    val reminderState = viewModel.reminderState.value
+    val showAddDialog = viewModel.showAddReminderDialog.value
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBackClick) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            }
-            Text(
-                text = "Medication Reminders",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
+    var contentVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(300)
+        contentVisible = true
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Medication Reminders")
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
             )
+        },
+        floatingActionButton = {
             FloatingActionButton(
-                onClick = onAddReminder,
-                modifier = Modifier.size(48.dp)
+                onClick = { viewModel.showAddReminderDialog() },
+                containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Reminder")
             }
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (reminders.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+    ) { paddingValues ->
+        AnimatedVisibility(
+            visible = contentVisible,
+            enter = fadeIn(animationSpec = tween(800))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // Summary
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
                 ) {
-                    Icon(
-                        Icons.Default.Notifications,
-                        contentDescription = "No reminders",
-                        modifier = Modifier.size(80.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "No reminders set",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "Add reminders to never miss a dose",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(onClick = onAddReminder) {
-                        Text("Add Your First Reminder")
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Reminder Summary",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Active: ${reminderState.reminders.count { it.isActive }}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "Total: ${reminderState.reminders.size}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Reminders List
+                if (reminderState.isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Loading reminders...")
+                        }
+                    }
+                } else if (reminderState.reminders.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "No reminders",
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "No reminders yet",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Tap the + button to add your first reminder",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(reminderState.reminders) { reminder ->
+                            ReminderCard(
+                                reminder = reminder,
+                                onEdit = {
+                                    // For now, just show add dialog with existing data
+                                    // In a real app, you'd have an edit mode
+                                    viewModel.showAddReminderDialog()
+                                },
+                                onDelete = {
+                                    viewModel.deleteReminder(reminder.id)
+                                },
+                                onToggleActive = {
+                                    viewModel.toggleReminderActive(reminder.id)
+                                }
+                            )
+                        }
                     }
                 }
             }
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(reminders) { reminder ->
-                    ReminderCard(reminder = reminder)
+        }
+
+        // Add Reminder Dialog
+        if (showAddDialog) {
+            AddReminderDialog(
+                onDismiss = { viewModel.hideAddReminderDialog() },
+                onSave = { reminder ->
+                    viewModel.addReminder(reminder)
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun ReminderCard(reminder: MedicationReminder) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = reminder.medicationName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = formatTime(reminder.hour, reminder.minute),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Dosage: ${reminder.dosage}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = "Days: ${getDaysString(reminder.days)}",
-                style = MaterialTheme.typography.bodyMedium
             )
         }
     }
-}
-
-private fun formatTime(hour: Int, minute: Int): String {
-    val amPm = if (hour < 12) "AM" else "PM"
-    val displayHour = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
-    return String.format("%d:%02d %s", displayHour, minute, amPm)
-}
-
-private fun getDaysString(days: List<Int>): String {
-    val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-    return days.map { dayNames[it - 1] }.joinToString(", ")
 }

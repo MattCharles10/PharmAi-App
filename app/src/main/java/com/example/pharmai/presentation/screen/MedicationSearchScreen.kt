@@ -1,321 +1,151 @@
 package com.example.pharmai.presentation.screen
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.pharmai.presentation.component.medication.MedicationCard
-import com.example.pharmai.presentation.viewmodel.MedicationViewModel
+import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicationSearchScreen(
-    onBackClick: () -> Unit
+    onNavigateBack: () -> Unit
 ) {
-    val viewModel: MedicationViewModel = viewModel()
     var searchQuery by remember { mutableStateOf("") }
-    val searchResults by viewModel.searchResults.collectAsState()
-    val isSearching by viewModel.isSearching.collectAsState()
-    val searchError by viewModel.searchError.collectAsState()
-    val keyboardController = LocalSoftwareKeyboardController.current
+    var searchResults by remember { mutableStateOf(emptyList<Medication>()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var contentVisible by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        delay(300)
+        contentVisible = true
+    }
+
+    // Use LaunchedEffect to handle search
     LaunchedEffect(searchQuery) {
-        if (searchQuery.length >= 2) {
-            viewModel.searchMedications(searchQuery)
-        } else if (searchQuery.isEmpty()) {
-            viewModel.clearSearch()
+        if (searchQuery.length > 2) {
+            isLoading = true
+            delay(500) // Simulate network delay
+            searchResults = performSearch(searchQuery)
+            isLoading = false
+        } else {
+            searchResults = emptyList()
         }
     }
 
-    // FIX: Use Box as root container to handle different states properly
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Header - Fixed at top
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = {
-                        onBackClick()
-                    }
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Medication Search",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Error Message
-            AnimatedVisibility(visible = searchError != null) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Default.Warning,
-                            contentDescription = "Error",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = searchError ?: "Unknown error",
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(
-                            onClick = { viewModel.clearError() },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Close error")
-                        }
+                        Text("Medication Search")
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
-            }
-
-            // Search Bar - Fixed below header
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp)),
-                placeholder = { Text("Search medications...") },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = "Search")
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = {
-                            searchQuery = ""
-                            viewModel.clearSearch()
-                        }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
-                        }
-                    }
-                },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Text,
-                    imeAction = ImeAction.Search
-                ),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        keyboardController?.hide()
-                        viewModel.searchMedications(searchQuery)
-                    }
-                ),
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
             )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // FIX: Content Area - This will scroll based on state
-            Box(
+        }
+    ) { paddingValues ->
+        AnimatedVisibility(
+            visible = contentVisible,
+            enter = fadeIn(animationSpec = tween(800))
+        ) {
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .weight(1f) // FIX: Takes all remaining space
+                    .padding(paddingValues)
+                    .padding(16.dp)
             ) {
-                // Search Results - FIXED SCROLLING
-                when {
-                    isSearching -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                CircularProgressIndicator()
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text("Searching medication databases...")
-                            }
-                        }
-                    }
-                    searchResults.isNotEmpty() -> {
-                        Column(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            // Results count
-                            Text(
-                                text = "Found ${searchResults.size} medication(s)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
+                // Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search medications...") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                )
 
-                            // FIX: LazyColumn with proper constraints
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .weight(1f), // FIX: Takes all available space
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                                contentPadding = PaddingValues(vertical = 8.dp)
-                            ) {
-                                items(searchResults) { medication ->
-                                    MedicationCard(medication = medication)
-                                }
-                            }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Search Results or Empty State
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Searching...")
                         }
                     }
-                    searchQuery.length >= 2 && searchError == null -> {
-                        // No results but no error
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState()), // FIX: Make scrollable
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
+                } else if (searchResults.isNotEmpty()) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(searchResults) { medication ->
+                            MedicationCard(medication = medication)
+                        }
+                    }
+                } else if (searchQuery.length > 2) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No medications found",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
-                                Icons.Default.Medication,
-                                contentDescription = "No results",
+                                Icons.Default.Search,
+                                contentDescription = "Search",
                                 modifier = Modifier.size(64.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "No medications found",
+                                text = "Search for medications by name",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "Try searching with a different term",
+                                text = "Type at least 3 characters to search",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.outline
                             )
-                        }
-                    }
-                    else -> {
-                        // Initial state - FIX: Make properly scrollable
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState()),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Spacer(modifier = Modifier.height(20.dp))
-
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Search",
-                                modifier = Modifier.size(80.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Search for medications",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "Enter the name of a medication to get started",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(32.dp))
-
-                            // Quick search suggestions
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "Try searching for:",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    SuggestionChip(
-                                        text = "Aspirin",
-                                        onClick = { searchQuery = "Aspirin" }
-                                    )
-                                    SuggestionChip(
-                                        text = "Lisinopril",
-                                        onClick = { searchQuery = "Lisinopril" }
-                                    )
-                                    SuggestionChip(
-                                        text = "Metformin",
-                                        onClick = { searchQuery = "Metformin" }
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(40.dp))
-
-                            // Features section
-                            Column {
-                                Text(
-                                    text = "Features",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                )
-
-                                FeatureItem(
-                                    icon = Icons.Default.Medication,
-                                    title = "Real API Data",
-                                    description = "Search from RxNorm database with real medication information"
-                                )
-                                FeatureItem(
-                                    icon = Icons.Default.Warning,
-                                    title = "Drug Interactions",
-                                    description = "Check medication safety with detailed interaction warnings"
-                                )
-                                FeatureItem(
-                                    icon = Icons.Default.Info,
-                                    title = "Detailed Information",
-                                    description = "Complete drug profiles with dosage and usage information"
-                                )
-                                FeatureItem(
-                                    icon = Icons.Default.Security,
-                                    title = "Safety First",
-                                    description = "Color-coded risk levels for safe medication management"
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(60.dp))
                         }
                     }
                 }
@@ -325,84 +155,119 @@ fun MedicationSearchScreen(
 }
 
 @Composable
-fun FeatureItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    description: String
-) {
+fun MedicationCard(medication: Medication) {
+    var expanded by remember { mutableStateOf(false) }
+
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        onClick = { expanded = !expanded },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(16.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
+            Text(
+                text = medication.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = medication.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Dosage: ${medication.dosage}",
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Divider()
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Uses: ${medication.uses}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Side Effects: ${medication.sideEffects}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
     }
 }
 
-@Composable
-fun MedicationChip(
-    text: String,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary
-) {
-    Surface(
-        modifier = Modifier.clip(RoundedCornerShape(8.dp)),
-        color = color.copy(alpha = 0.1f)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+// Mock function to simulate search
+private fun performSearch(query: String): List<Medication> {
+    val mockMedications = listOf(
+        Medication(
+            name = "Aspirin",
+            description = "Pain reliever and anti-inflammatory",
+            dosage = "81mg",
+            uses = "Pain relief, fever reduction, anti-inflammatory",
+            sideEffects = "Stomach upset, bleeding risk"
+        ),
+        Medication(
+            name = "Lisinopril",
+            description = "ACE inhibitor for blood pressure",
+            dosage = "10mg",
+            uses = "High blood pressure, heart failure",
+            sideEffects = "Cough, dizziness, kidney problems"
+        ),
+        Medication(
+            name = "Metformin",
+            description = "Diabetes medication",
+            dosage = "500mg",
+            uses = "Type 2 diabetes management",
+            sideEffects = "Nausea, diarrhea, stomach upset"
+        ),
+        Medication(
+            name = "Atorvastatin",
+            description = "Cholesterol medication",
+            dosage = "20mg",
+            uses = "High cholesterol, heart disease prevention",
+            sideEffects = "Muscle pain, liver problems"
+        ),
+        Medication(
+            name = "Levothyroxine",
+            description = "Thyroid hormone replacement",
+            dosage = "50mcg",
+            uses = "Hypothyroidism treatment",
+            sideEffects = "Palpitations, weight loss, insomnia"
+        ),
+        Medication(
+            name = "Amoxicillin",
+            description = "Antibiotic",
+            dosage = "500mg",
+            uses = "Bacterial infections",
+            sideEffects = "Diarrhea, nausea, rash"
+        ),
+        Medication(
+            name = "Ibuprofen",
+            description = "NSAID pain reliever",
+            dosage = "400mg",
+            uses = "Pain, inflammation, fever",
+            sideEffects = "Stomach upset, kidney problems"
         )
+    )
+
+    return mockMedications.filter {
+        it.name.contains(query, ignoreCase = true) ||
+                it.description.contains(query, ignoreCase = true)
     }
 }
 
-@Composable
-fun SuggestionChip(
-    text: String,
-    onClick: () -> Unit
-) {
-    FilterChip(
-        selected = false,
-        onClick = onClick,
-        label = {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall
-            )
-        },
-        modifier = Modifier.height(32.dp)
-    )
-}
+data class Medication(
+    val name: String,
+    val description: String,
+    val dosage: String,
+    val uses: String = "Not specified",
+    val sideEffects: String = "Not specified"
+)
